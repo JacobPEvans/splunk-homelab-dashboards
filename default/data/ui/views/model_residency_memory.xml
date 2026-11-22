@@ -73,6 +73,26 @@
         }
       }
     },
+    "ds_macmon_pressure_pct": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=mac_perf sourcetype=\"macos:perf:macmon\" host=$host$ | dedup _time host | rename \"memory.pressure_percent\" AS pressure_pct | where isnotnull(pressure_pct) | timechart span=5m avg(pressure_pct) AS pressure_pct BY host limit=0 useother=f",
+        "queryParameters": {
+          "earliest": "$time.earliest$",
+          "latest": "$time.latest$"
+        }
+      }
+    },
+    "ds_swap_used": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=llm sourcetype=mlx:metrics host=$host$ node_memory_swap_used_bytes=* | timechart span=5m avg(node_memory_swap_used_bytes) AS swap_used_bytes BY host limit=0 useother=f",
+        "queryParameters": {
+          "earliest": "$time.earliest$",
+          "latest": "$time.latest$"
+        }
+      }
+    },
     "ds_memory_event_counts": {
       "type": "ds.search",
       "options": {
@@ -113,6 +133,24 @@
       },
       "options": {}
     },
+    "viz_macmon_pressure_pct": {
+      "type": "splunk.line",
+      "title": "Memory pressure by host (macmon)",
+      "description": "Average of the macmon memory pressure percentage per 5 minutes.",
+      "dataSources": {
+        "primary": "ds_macmon_pressure_pct"
+      },
+      "options": {}
+    },
+    "viz_swap_used": {
+      "type": "splunk.line",
+      "title": "Swap used by host",
+      "description": "Average of node_memory_swap_used_bytes per 5 minutes, from the system-metrics feed.",
+      "dataSources": {
+        "primary": "ds_swap_used"
+      },
+      "options": {}
+    },
     "viz_memory_event_counts": {
       "type": "splunk.line",
       "title": "Memory kill, memory pressure, and freeze events per hour",
@@ -136,14 +174,16 @@
     "type": "grid",
     "options": {
       "width": 1440,
-      "height": 1060,
+      "height": 1320,
       "display": "auto-scale"
     },
     "structure": [
       {"item": "viz_host_memory_pct", "type": "block", "position": {"x": 0, "y": 0, "w": 720, "h": 320}},
       {"item": "viz_macmon_memory_pct", "type": "block", "position": {"x": 720, "y": 0, "w": 720, "h": 320}},
-      {"item": "viz_memory_event_counts", "type": "block", "position": {"x": 0, "y": 320, "w": 1440, "h": 300}},
-      {"item": "viz_memory_event_table", "type": "block", "position": {"x": 0, "y": 620, "w": 1440, "h": 440}}
+      {"item": "viz_macmon_pressure_pct", "type": "block", "position": {"x": 0, "y": 320, "w": 720, "h": 260}},
+      {"item": "viz_swap_used", "type": "block", "position": {"x": 720, "y": 320, "w": 720, "h": 260}},
+      {"item": "viz_memory_event_counts", "type": "block", "position": {"x": 0, "y": 580, "w": 1440, "h": 300}},
+      {"item": "viz_memory_event_table", "type": "block", "position": {"x": 0, "y": 880, "w": 1440, "h": 440}}
     ],
     "globalInputs": ["input_time", "input_host"]
   }

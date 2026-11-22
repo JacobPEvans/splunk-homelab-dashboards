@@ -74,6 +74,21 @@ class DashboardViewsTest(unittest.TestCase):
                 self.assertRegex(query, r"^index=(llm|mac_perf|os)\b")
                 self.assertNotIn("index=*", query)
 
+    def test_swap_and_pressure_panels_use_their_source_field_names(self):
+        sources = json.loads(
+            ET.parse(VIEWS / "model_residency_memory.xml")
+            .getroot()
+            .findtext("definition")
+        )["dataSources"]
+        self.assertIn(
+            "node_memory_swap_used_bytes=*",
+            sources["ds_swap_used"]["options"]["query"],
+        )
+        self.assertIn(
+            '"memory.pressure_percent"',
+            sources["ds_macmon_pressure_pct"]["options"]["query"],
+        )
+
     def test_macmon_panel_renames_dotted_memory_fields_and_drops_duplicates(self):
         root = ET.parse(VIEWS / "model_residency_memory.xml").getroot()
         query = json.loads(root.findtext("definition"))["dataSources"][

@@ -112,11 +112,11 @@ the local tests; empty panels can mean unmatched fields or unavailable data.
 - `node_gpu_*`: index not confirmed, so searches use `index=*`; dimension `host`
   (assumed).
 - Model Residency and Memory: `index=llm sourcetype=mlx:metrics`
-  (`node_memory_used_percent`), `index=mac_perf sourcetype=macos:perf:macmon`
-  (`ram_used_bytes`, `ram_total_bytes`), and `index=os` with
-  `sourcetype=macos:unified_log` or `macos:crashreport`. These searches are not
-  validated against live data. Model load and unload events, per-process memory,
-  and swap are not included.
+  (`node_memory_used_percent`, `node_memory_swap_used_bytes`),
+  `index=mac_perf sourcetype=macos:perf:macmon` (`memory.ram_usage`,
+  `memory.ram_total`, `memory.pressure_percent`), and `index=os` with
+  `sourcetype=macos:unified_log` or `macos:crashreport`. Model load and unload
+  events are not included.
 
 `host_metrics` and the `host` dimension come from the `ZFS ARC pressure` and
 `object store volume fill` searches in `splunk-homelab-alerts`. No index
