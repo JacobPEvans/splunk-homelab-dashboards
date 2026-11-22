@@ -19,6 +19,7 @@ class DashboardViewsTest(unittest.TestCase):
                 "agent_activity",
                 "agent_timeline",
                 "agent_network",
+                "model_residency_memory",
             },
         )
 
@@ -52,8 +53,83 @@ class DashboardViewsTest(unittest.TestCase):
                 "agent_activity",
                 "agent_timeline",
                 "agent_network",
+                "model_residency_memory",
             },
         )
+
+    def test_model_residency_memory_uses_declared_indexes_and_global_time(self):
+        root = ET.parse(VIEWS / "model_residency_memory.xml").getroot()
+        dashboard = json.loads(root.findtext("definition"))
+        self.assertEqual(
+            dashboard["layout"]["globalInputs"], ["input_time", "input_host"]
+        )
+        self.assertEqual(
+            dashboard["inputs"]["input_time"]["options"]["defaultValue"],
+            "-24h@h,now",
+        )
+        for source_id, source in dashboard["dataSources"].items():
+            with self.subTest(source=source_id):
+                query = source["options"]["query"]
+                self.assertEqual(source["type"], "ds.search")
+                self.assertRegex(
+                    query, r"^(\| tstats count where )?index=(llm|mac_perf|os)\b"
+                )
+                self.assertNotIn("index=*", query)
+
+    def test_model_panels_use_phys_footprint_and_normalise_model_names(self):
+        dashboard = json.loads(
+            ET.parse(VIEWS / "model_residency_memory.xml")
+            .getroot()
+            .findtext("definition")
+        )
+        sources = dashboard["dataSources"]
+        for source_id in ("ds_model_phys", "ds_model_restarts"):
+            with self.subTest(source=source_id):
+                query = sources[source_id]["options"]["query"]
+                self.assertIn("process_phys_footprint_bytes", query)
+                self.assertNotIn("process_resident_memory_bytes", query)
+                self.assertIn("models--(?<org>", query)
+                self.assertIn(r"--model (?<model>\S+)", query)
+                # Each process field arrives twice (multivalue); a multivalue org/repo concat yields null.
+                self.assertIn("eval process_cmdline=mvindex(process_cmdline,0)", query)
+        self.assertIn(
+            "stats min(_time) AS first_seen max(_time) AS last_seen "
+            "BY host model process_pid",
+            sources["ds_model_restarts"]["options"]["query"],
+        )
+        self.assertEqual(
+            dashboard["visualizations"]["viz_model_memory_stacked"]["type"],
+            "splunk.area",
+        )
+
+    def test_swap_and_pressure_panels_use_their_source_field_names(self):
+        sources = json.loads(
+            ET.parse(VIEWS / "model_residency_memory.xml")
+            .getroot()
+            .findtext("definition")
+        )["dataSources"]
+        self.assertIn(
+            "node_memory_swap_used_bytes=*",
+            sources["ds_swap_used"]["options"]["query"],
+        )
+        self.assertIn(
+            '"memory.pressure_percent"',
+            sources["ds_macmon_pressure_pct"]["options"]["query"],
+        )
+
+    def test_macmon_panel_renames_dotted_memory_fields_and_drops_duplicates(self):
+        root = ET.parse(VIEWS / "model_residency_memory.xml").getroot()
+        query = json.loads(root.findtext("definition"))["dataSources"][
+            "ds_macmon_memory_pct"
+        ]["options"]["query"]
+        rename = (
+            'rename "memory.ram_usage" AS ram_used_bytes, '
+            '"memory.ram_total" AS ram_total_bytes'
+        )
+        self.assertIn(rename, query)
+        self.assertIn("dedup _time host", query)
+        self.assertLess(query.index("dedup _time host"), query.index(rename))
+        self.assertLess(query.index(rename), query.index("ram_total_bytes>0"))
 
     def test_agent_activity_uses_bounded_event_searches_and_global_time(self):
         root = ET.parse(VIEWS / "agent_activity.xml").getroot()
