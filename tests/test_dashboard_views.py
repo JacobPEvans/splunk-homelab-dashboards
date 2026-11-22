@@ -71,7 +71,9 @@ class DashboardViewsTest(unittest.TestCase):
             with self.subTest(source=source_id):
                 query = source["options"]["query"]
                 self.assertEqual(source["type"], "ds.search")
-                self.assertRegex(query, r"^index=(llm|mac_perf|os)\b")
+                self.assertRegex(
+                    query, r"^(\| tstats count where )?index=(llm|mac_perf|os)\b"
+                )
                 self.assertNotIn("index=*", query)
 
     def test_model_panels_use_phys_footprint_and_normalise_model_names(self):
@@ -88,6 +90,8 @@ class DashboardViewsTest(unittest.TestCase):
                 self.assertNotIn("process_resident_memory_bytes", query)
                 self.assertIn("models--(?<org>", query)
                 self.assertIn(r"--model (?<model>\S+)", query)
+                # Each process field arrives twice (multivalue); a multivalue org/repo concat yields null.
+                self.assertIn("eval process_cmdline=mvindex(process_cmdline,0)", query)
         self.assertIn(
             "stats min(_time) AS first_seen max(_time) AS last_seen "
             "BY host model process_pid",

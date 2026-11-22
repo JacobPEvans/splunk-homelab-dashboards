@@ -46,7 +46,7 @@
     "ds_input_hosts": {
       "type": "ds.search",
       "options": {
-        "query": "index=llm sourcetype=mlx:metrics | stats count BY host | eval label=host, value=host | append [| makeresults | eval label=\"All hosts\", value=\"*\"] | fields label value",
+        "query": "| tstats count where index=llm sourcetype=mlx:metrics BY host | eval label=host, value=host | append [| makeresults | eval label=\"All hosts\", value=\"*\"] | fields label value",
         "queryParameters": {
           "earliest": "-30d",
           "latest": "now"
@@ -76,7 +76,7 @@
     "ds_model_phys": {
       "type": "ds.search",
       "options": {
-        "query": "index=llm sourcetype=mlx:metrics host=$host$ process_phys_footprint_bytes=* | rex field=process_cmdline \"--model (?<model>\\S+)\" | where isnotnull(model) | rex field=model \"models--(?<org>[^-]+(?:-[^-]+)*)--(?<repo>[^/]+)\" | eval model=if(isnotnull(org) AND isnotnull(repo), org.\"/\".repo, model) | timechart span=5m max(process_phys_footprint_bytes) AS phys_bytes BY model limit=0 useother=f",
+        "query": "index=llm sourcetype=mlx:metrics host=$host$ process_phys_footprint_bytes=* | eval process_cmdline=mvindex(process_cmdline,0) | rex field=process_cmdline \"--model (?<model>\\S+)\" | where isnotnull(model) | rex field=model \"models--(?<org>[^-]+(?:-[^-]+)*)--(?<repo>[^/]+)\" | eval model=if(isnotnull(org) AND isnotnull(repo), org.\"/\".repo, model) | timechart span=5m max(process_phys_footprint_bytes) AS phys_bytes BY model limit=0 useother=f",
         "queryParameters": {
           "earliest": "$time.earliest$",
           "latest": "$time.latest$"
@@ -86,7 +86,7 @@
     "ds_model_restarts": {
       "type": "ds.search",
       "options": {
-        "query": "index=llm sourcetype=mlx:metrics host=$host$ process_phys_footprint_bytes=* | rex field=process_cmdline \"--model (?<model>\\S+)\" | where isnotnull(model) | rex field=model \"models--(?<org>[^-]+(?:-[^-]+)*)--(?<repo>[^/]+)\" | eval model=if(isnotnull(org) AND isnotnull(repo), org.\"/\".repo, model) | stats min(_time) AS first_seen max(_time) AS last_seen BY host model process_pid | sort 0 host model first_seen | eval first_seen=strftime(first_seen,\"%F %T\"), last_seen=strftime(last_seen,\"%F %T\") | table host model process_pid first_seen last_seen | head 200",
+        "query": "index=llm sourcetype=mlx:metrics host=$host$ process_phys_footprint_bytes=* | eval process_cmdline=mvindex(process_cmdline,0) | rex field=process_cmdline \"--model (?<model>\\S+)\" | where isnotnull(model) | rex field=model \"models--(?<org>[^-]+(?:-[^-]+)*)--(?<repo>[^/]+)\" | eval model=if(isnotnull(org) AND isnotnull(repo), org.\"/\".repo, model) | stats min(_time) AS first_seen max(_time) AS last_seen BY host model process_pid | sort 0 host model first_seen | eval first_seen=strftime(first_seen,\"%F %T\"), last_seen=strftime(last_seen,\"%F %T\") | table host model process_pid first_seen last_seen | head 200",
         "queryParameters": {
           "earliest": "$time.earliest$",
           "latest": "$time.latest$"
