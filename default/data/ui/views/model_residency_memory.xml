@@ -1,0 +1,152 @@
+<dashboard version="2" theme="light">
+  <label>Model Residency and Memory</label>
+  <description>Memory use per Mac inference host, plus macOS memory-kill, memory-pressure, and WindowServer freeze events. Searches are unvalidated against live data.</description>
+  <definition><![CDATA[
+{
+  "title": "Model Residency and Memory",
+  "description": "Memory use per Mac inference host and macOS memory-kill, memory-pressure, and freeze events. Model load and unload timelines and per-process memory are not included.",
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": {
+            "earliest": "$time.earliest$",
+            "latest": "$time.latest$"
+          }
+        }
+      }
+    }
+  },
+  "inputs": {
+    "input_time": {
+      "type": "input.timerange",
+      "title": "Time range",
+      "options": {
+        "token": "time",
+        "defaultValue": "-24h@h,now"
+      }
+    },
+    "input_host": {
+      "type": "input.dropdown",
+      "title": "Host",
+      "options": {
+        "token": "host",
+        "defaultValue": "*",
+        "selectFirstSearchResult": false,
+        "searchWhenChanged": true,
+        "items": {
+          "dataSources": {
+            "primary": "ds_input_hosts"
+          }
+        }
+      }
+    }
+  },
+  "dataSources": {
+    "ds_input_hosts": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=llm sourcetype=mlx:metrics | stats count BY host | eval label=host, value=host | append [| makeresults | eval label=\"All hosts\", value=\"*\"] | fields label value",
+        "queryParameters": {
+          "earliest": "-30d",
+          "latest": "now"
+        }
+      }
+    },
+    "ds_host_memory_pct": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=llm sourcetype=mlx:metrics host=$host$ node_memory_used_percent=* | timechart span=5m avg(node_memory_used_percent) AS used_pct BY host limit=0 useother=f",
+        "queryParameters": {
+          "earliest": "$time.earliest$",
+          "latest": "$time.latest$"
+        }
+      }
+    },
+    "ds_macmon_memory_pct": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=mac_perf sourcetype=\"macos:perf:macmon\" host=$host$ | where ram_total_bytes>0 | eval used_pct=round(100*ram_used_bytes/ram_total_bytes,1) | timechart span=5m avg(used_pct) AS used_pct BY host limit=0 useother=f",
+        "queryParameters": {
+          "earliest": "$time.earliest$",
+          "latest": "$time.latest$"
+        }
+      }
+    },
+    "ds_memory_event_counts": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=os host=$host$ ((sourcetype=\"macos:unified_log\" (\"jetsam\" OR \"memorystatus\" OR \"memory pressure\" OR \"userspace watchdog timeout\" OR \"synchronize timed out\" OR \"failed to act\" OR \"Clearing datagram buffer\" OR \"gpu hang\" OR \"GPU restart\")) OR (sourcetype=\"macos:crashreport\" (source=\"*JetsamEvent*\" OR \"userspace watchdog timeout\"))) | eval category=case(match(_raw,\"(?i)jetsam|memorystatus\") OR match(source,\"JetsamEvent\"),\"memory kill\", match(_raw,\"(?i)memory pressure\"),\"memory pressure\", true(),\"freeze or watchdog\") | timechart span=1h count BY category limit=0 useother=f",
+        "queryParameters": {
+          "earliest": "$time.earliest$",
+          "latest": "$time.latest$"
+        }
+      }
+    },
+    "ds_memory_event_table": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=os host=$host$ ((sourcetype=\"macos:unified_log\" (\"jetsam\" OR \"memorystatus\" OR \"memory pressure\" OR \"userspace watchdog timeout\" OR \"synchronize timed out\" OR \"failed to act\" OR \"Clearing datagram buffer\" OR \"gpu hang\" OR \"GPU restart\")) OR (sourcetype=\"macos:crashreport\" (source=\"*JetsamEvent*\" OR \"userspace watchdog timeout\"))) | eval category=case(match(_raw,\"(?i)jetsam|memorystatus\") OR match(source,\"JetsamEvent\"),\"memory kill\", match(_raw,\"(?i)memory pressure\"),\"memory pressure\", true(),\"freeze or watchdog\") | eval raw_excerpt=substr(_raw,1,240) | table _time host sourcetype category raw_excerpt | sort 0 - _time | head 200",
+        "queryParameters": {
+          "earliest": "$time.earliest$",
+          "latest": "$time.latest$"
+        }
+      }
+    }
+  },
+  "visualizations": {
+    "viz_host_memory_pct": {
+      "type": "splunk.line",
+      "title": "Memory used by host (node metrics)",
+      "description": "Average of node_memory_used_percent per 5 minutes, from the system-metrics feed.",
+      "dataSources": {
+        "primary": "ds_host_memory_pct"
+      },
+      "options": {}
+    },
+    "viz_macmon_memory_pct": {
+      "type": "splunk.line",
+      "title": "Memory used by host (macmon)",
+      "description": "RAM used divided by RAM total, from the macmon exec input.",
+      "dataSources": {
+        "primary": "ds_macmon_memory_pct"
+      },
+      "options": {}
+    },
+    "viz_memory_event_counts": {
+      "type": "splunk.line",
+      "title": "Memory kill, memory pressure, and freeze events per hour",
+      "description": "Counts from the macOS unified log and crash reports, grouped by category.",
+      "dataSources": {
+        "primary": "ds_memory_event_counts"
+      },
+      "options": {}
+    },
+    "viz_memory_event_table": {
+      "type": "splunk.table",
+      "title": "Memory and freeze events",
+      "description": "Most recent 200 matching events. Excerpt is the first 240 characters of the raw event.",
+      "dataSources": {
+        "primary": "ds_memory_event_table"
+      },
+      "options": {}
+    }
+  },
+  "layout": {
+    "type": "grid",
+    "options": {
+      "width": 1440,
+      "height": 1060,
+      "display": "auto-scale"
+    },
+    "structure": [
+      {"item": "viz_host_memory_pct", "type": "block", "position": {"x": 0, "y": 0, "w": 720, "h": 320}},
+      {"item": "viz_macmon_memory_pct", "type": "block", "position": {"x": 720, "y": 0, "w": 720, "h": 320}},
+      {"item": "viz_memory_event_counts", "type": "block", "position": {"x": 0, "y": 320, "w": 1440, "h": 300}},
+      {"item": "viz_memory_event_table", "type": "block", "position": {"x": 0, "y": 620, "w": 1440, "h": 440}}
+    ],
+    "globalInputs": ["input_time", "input_host"]
+  }
+}
+  ]]></definition>
+</dashboard>

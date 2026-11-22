@@ -4,4 +4,5 @@
   <view name="agent_activity" />
   <view name="agent_timeline" />
   <view name="agent_network" />
+  <view name="model_residency_memory" />
 </nav>

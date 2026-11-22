@@ -10,6 +10,9 @@ A Splunk app with Dashboard Studio views over homelab metrics and agent logs.
 - **Agent Activity (Beta)** (`agent_activity`): event counts by agent index and
   sourcetype, cron terminal events and outcomes, errors, and available gateway,
   retain, and recall timings from the `hermes` and `hindsight` indexes.
+- **Model Residency and Memory** (`model_residency_memory`): memory use per Mac
+  inference host from the system-metrics and macmon feeds, plus macOS memory-kill,
+  memory-pressure, and freeze events from the unified log and crash reports.
 
 | Additional beta view | View ID | Required Splunk Enterprise version |
 | --- | --- | --- |
@@ -108,6 +111,12 @@ the local tests; empty panels can mean unmatched fields or unavailable data.
   `disk`.
 - `node_gpu_*`: index not confirmed, so searches use `index=*`; dimension `host`
   (assumed).
+- Model Residency and Memory: `index=llm sourcetype=mlx:metrics`
+  (`node_memory_used_percent`), `index=mac_perf sourcetype=macos:perf:macmon`
+  (`ram_used_bytes`, `ram_total_bytes`), and `index=os` with
+  `sourcetype=macos:unified_log` or `macos:crashreport`. These searches are not
+  validated against live data. Model load and unload events, per-process memory,
+  and swap are not included.
 
 `host_metrics` and the `host` dimension come from the `ZFS ARC pressure` and
 `object store volume fill` searches in `splunk-homelab-alerts`. No index

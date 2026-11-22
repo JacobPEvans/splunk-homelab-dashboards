@@ -19,6 +19,7 @@ class DashboardViewsTest(unittest.TestCase):
                 "agent_activity",
                 "agent_timeline",
                 "agent_network",
+                "model_residency_memory",
             },
         )
 
@@ -52,8 +53,26 @@ class DashboardViewsTest(unittest.TestCase):
                 "agent_activity",
                 "agent_timeline",
                 "agent_network",
+                "model_residency_memory",
             },
         )
+
+    def test_model_residency_memory_uses_declared_indexes_and_global_time(self):
+        root = ET.parse(VIEWS / "model_residency_memory.xml").getroot()
+        dashboard = json.loads(root.findtext("definition"))
+        self.assertEqual(
+            dashboard["layout"]["globalInputs"], ["input_time", "input_host"]
+        )
+        self.assertEqual(
+            dashboard["inputs"]["input_time"]["options"]["defaultValue"],
+            "-24h@h,now",
+        )
+        for source_id, source in dashboard["dataSources"].items():
+            with self.subTest(source=source_id):
+                query = source["options"]["query"]
+                self.assertEqual(source["type"], "ds.search")
+                self.assertRegex(query, r"^index=(llm|mac_perf|os)\b")
+                self.assertNotIn("index=*", query)
 
     def test_agent_activity_uses_bounded_event_searches_and_global_time(self):
         root = ET.parse(VIEWS / "agent_activity.xml").getroot()
