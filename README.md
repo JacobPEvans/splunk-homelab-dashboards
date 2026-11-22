@@ -11,7 +11,8 @@ A Splunk app with Dashboard Studio views over homelab metrics and agent logs.
   sourcetype, cron terminal events and outcomes, errors, and available gateway,
   retain, and recall timings from the `hermes` and `hindsight` indexes.
 - **Model Residency and Memory** (`model_residency_memory`): memory use per Mac
-  inference host from the system-metrics and macmon feeds, plus macOS memory-kill,
+  inference host from the system-metrics and macmon feeds, swap, memory pressure,
+  per-model process memory with restart history, and macOS memory-kill,
   memory-pressure, and freeze events from the unified log and crash reports.
 
 | Additional beta view | View ID | Required Splunk Enterprise version |
@@ -112,11 +113,15 @@ the local tests; empty panels can mean unmatched fields or unavailable data.
 - `node_gpu_*`: index not confirmed, so searches use `index=*`; dimension `host`
   (assumed).
 - Model Residency and Memory: `index=llm sourcetype=mlx:metrics`
-  (`node_memory_used_percent`, `node_memory_swap_used_bytes`),
-  `index=mac_perf sourcetype=macos:perf:macmon` (`memory.ram_usage`,
-  `memory.ram_total`, `memory.pressure_percent`), and `index=os` with
-  `sourcetype=macos:unified_log` or `macos:crashreport`. Model load and unload
-  events are not included.
+  (`node_memory_used_percent`, `node_memory_swap_used_bytes`,
+  `node_memory_total_bytes`, `process_cmdline`, `process_pid`,
+  `process_phys_footprint_bytes`), `index=mac_perf sourcetype=macos:perf:macmon`
+  (`memory.ram_usage`, `memory.ram_total`, `memory.pressure_percent`), and
+  `index=os` with `sourcetype=macos:unified_log` or `macos:crashreport`.
+  Per-model memory uses `process_phys_footprint_bytes`, which counts Metal
+  memory, and the model name from `--model` in `process_cmdline`. Model load
+  and unload events are not included. Residency is inferred from whether a
+  model's process reports memory.
 
 `host_metrics` and the `host` dimension come from the `ZFS ARC pressure` and
 `object store volume fill` searches in `splunk-homelab-alerts`. No index

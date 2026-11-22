@@ -74,6 +74,30 @@ class DashboardViewsTest(unittest.TestCase):
                 self.assertRegex(query, r"^index=(llm|mac_perf|os)\b")
                 self.assertNotIn("index=*", query)
 
+    def test_model_panels_use_phys_footprint_and_normalise_model_names(self):
+        dashboard = json.loads(
+            ET.parse(VIEWS / "model_residency_memory.xml")
+            .getroot()
+            .findtext("definition")
+        )
+        sources = dashboard["dataSources"]
+        for source_id in ("ds_model_phys", "ds_model_restarts"):
+            with self.subTest(source=source_id):
+                query = sources[source_id]["options"]["query"]
+                self.assertIn("process_phys_footprint_bytes", query)
+                self.assertNotIn("process_resident_memory_bytes", query)
+                self.assertIn("models--(?<org>", query)
+                self.assertIn(r"--model (?<model>\S+)", query)
+        self.assertIn(
+            "stats min(_time) AS first_seen max(_time) AS last_seen "
+            "BY host model process_pid",
+            sources["ds_model_restarts"]["options"]["query"],
+        )
+        self.assertEqual(
+            dashboard["visualizations"]["viz_model_memory_stacked"]["type"],
+            "splunk.area",
+        )
+
     def test_swap_and_pressure_panels_use_their_source_field_names(self):
         sources = json.loads(
             ET.parse(VIEWS / "model_residency_memory.xml")
