@@ -66,7 +66,7 @@
     "ds_macmon_memory_pct": {
       "type": "ds.search",
       "options": {
-        "query": "index=mac_perf sourcetype=\"macos:perf:macmon\" host=$host$ | where ram_total_bytes>0 | eval used_pct=round(100*ram_used_bytes/ram_total_bytes,1) | timechart span=5m avg(used_pct) AS used_pct BY host limit=0 useother=f",
+        "query": "index=mac_perf sourcetype=\"macos:perf:macmon\" host=$host$ | dedup _time host | rename \"memory.ram_usage\" AS ram_used_bytes, \"memory.ram_total\" AS ram_total_bytes | where ram_total_bytes>0 | eval used_pct=round(100*ram_used_bytes/ram_total_bytes,1) | timechart span=5m avg(used_pct) AS used_pct BY host limit=0 useother=f",
         "queryParameters": {
           "earliest": "$time.earliest$",
           "latest": "$time.latest$"

@@ -74,6 +74,20 @@ class DashboardViewsTest(unittest.TestCase):
                 self.assertRegex(query, r"^index=(llm|mac_perf|os)\b")
                 self.assertNotIn("index=*", query)
 
+    def test_macmon_panel_renames_dotted_memory_fields_and_drops_duplicates(self):
+        root = ET.parse(VIEWS / "model_residency_memory.xml").getroot()
+        query = json.loads(root.findtext("definition"))["dataSources"][
+            "ds_macmon_memory_pct"
+        ]["options"]["query"]
+        rename = (
+            'rename "memory.ram_usage" AS ram_used_bytes, '
+            '"memory.ram_total" AS ram_total_bytes'
+        )
+        self.assertIn(rename, query)
+        self.assertIn("dedup _time host", query)
+        self.assertLess(query.index("dedup _time host"), query.index(rename))
+        self.assertLess(query.index(rename), query.index("ram_total_bytes>0"))
+
     def test_agent_activity_uses_bounded_event_searches_and_global_time(self):
         root = ET.parse(VIEWS / "agent_activity.xml").getroot()
         dashboard = json.loads(root.findtext("definition"))
